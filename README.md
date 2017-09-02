@@ -1,6 +1,8 @@
 # DiscordConnector 
 
+#### Version 0.1.0
 
+___
 
 ## Description:
 

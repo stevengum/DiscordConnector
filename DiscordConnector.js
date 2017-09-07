@@ -199,7 +199,7 @@ class DiscordConnector {
             
             if (data.title) richEmbed.setTitle(data.title);
             if (data.subtitle) richEmbed.setDescription(data.subtitle);
-            if (data.description) richEmbed.addField('\u200B', data.description);
+            if (data.text) richEmbed.addField('\u200B', data.text);
 
             switch (typeOfCard) {
                 case 'adaptive':
@@ -226,7 +226,7 @@ class DiscordConnector {
                     //
                     break;
                 case 'video':
-                console.warn('DiscordConnector.richEmbedGenerator - WARN: Discord richEmbeds do not support video media. Down rendering to a simple embed.');
+                    console.warn('DiscordConnector.richEmbedGenerator - WARN: Discord richEmbeds do not support video media. Down rendering to a simple embed. Data may be lost.');
                     if (data.image && data.image.url) richEmbed.setImage(data.image.url); // Not sure if this is only video card that accepts one image.
                     if (data.media[0] && data.media[0].url) richEmbed.something;
                     var VideoEmbed = { }
@@ -303,7 +303,10 @@ class DiscordConnector {
      * @param {string} content 
      */
     processMention (content) {
-        if (typeof content != 'string' || content.trim() != true) return;
+        if (typeof content != 'string' || !content.trim()) {
+            console.log('DiscordConnector.processMention() - ERROR: Valid content not detected.');
+            return;
+        }
 
         var newContent = content.replace(/<@\d{18}>/gm, (match, offset, string) => {
             var userId = /\d{18}/.exec(match)[0];
@@ -351,28 +354,22 @@ class DiscordConnector {
                     if (msg.type === 'utf8' && msg.utf8Data.length > 0) {
                         var data = JSON.parse(msg.utf8Data);
                         var activities = data.activities;
+                        // This prevents any action from being undertaken on a message sent from this bot to a user.
+                        if (activities && activities[0].from.name != this.botName) return; 
 
-                        activities = this.deleteUserData(activities);
-
-                        // This prevents any action from being undertaken on a message sent from a user to a bot.
-                        if (activities[0].from.name !== 'squawk-box-bot') return; 
-                        
-                        console.log('~~~\nMessage received from DirectLine. See below:');
-                        console.log('Activity.from:');
-                        console.log(activities[0].from);
-                        if (activities[0].type == 'typing') {
+                        if (activities && activities[0].type == 'typing') {
                             this.discordChannel.startTyping();
                             return;
                         }
                         console.log('~~~');
-                        if (data.activities[0].recipient) {
+                        if (activities && activities[0].recipient) {
                             console.log('This is the activity\'s recipient');
                             console.log(data.activities[0].recipient);
                         }
 
                         // activities is an array of activities, and activities[i].attachments is an array of attachments
 
-                        if (activities[0].attachments) {
+                        if (activities && activities[0].attachments) {
                             var bot = this.client.user;
                             var embed = this.dlAttachmentHandler(activities[0]);
                             console.log('Right below me is the "embed":')
@@ -403,9 +400,9 @@ class DiscordConnector {
                             console.log(activities[0].attachments);
                         }
 
-                        if (activities[0].from.name == 'squawk-box-bot' && this.discordChannel /* If attachments from activity, skip this step. */ && !activities[0].attachments) {
+                        if (activities && activities[0].from.name == this.botName && this.discordChannel /* If attachments from activity, skip this step. */ && !activities[0].attachments) {
                             console.log('\nI send something to you.');
-                            if (activities[0].text) {
+                            if (activities && activities[0].text) {
                                 this.discordChannel.send(activities[0].text).catch((err) => {
                                     console.log('ERROR IN DL WEBSOCKET');
                                     console.error(err);
@@ -455,7 +452,6 @@ class DiscordConnector {
      * How would this look? Perhaps DiscordConnector.Guild = require('./Guild'); OR DiscordConnector.Guild = new (require('./Guild'));
      */
     postActivity (event) {
-        
         var activity = {};
         if (event.type == 'conversationUpdate') {
             activity = event;
@@ -478,7 +474,7 @@ class DiscordConnector {
             body: activity,
             json: true
         }).then((res) => {
-            console.log('response from directline' + res);
+            console.log('response from directline:\n' + JSON.stringify(res));
         });
     }
 

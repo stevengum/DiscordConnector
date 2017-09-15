@@ -1,28 +1,9 @@
 const rp = require('request-promise');
 const Discord = require('discord.js');
 const mime = require('mime-types');
-const ffmpeg = require('fluent-ffmpeg');
-const stream = require('stream');
-
-const fs = require('fs');
-const bingSpeech = require('bingspeech-api-client');
-const lame = require('lame');
-
-
-// @TODO: https://github.com/Microsoft/BotFramework-DirectLineJS/blob/master/src/directLine.ts#L384
-// StartConversations
-// @TODO: https://github.com/Microsoft/BotFramework-DirectLineJS/blob/master/src/directLine.ts#L463
-// PostActivity
-// There are other methods that need to be examined and then possible ported over.
-
-// Embeds
-// RichEmbeds <------ ------> RichCards
-// But RichEmbeds don't have buttons
-// When a bot adds a button to a card and sends it to the connector, 
-// emit/reply with notice that RichEmbeds do not support Buttons/SuggestedActions
 
 /**
- * Class that holds both the Direct Line websocket client and the Discord client.
+ * Class that holds both the Direct Line websocket clients and the Discord client.
  */
 class DiscordConnector {
 
@@ -30,26 +11,14 @@ class DiscordConnector {
         this.discordSecret = config.discordSecret;
         this.dlSecret = config.dlSecret;
         this.token;
-        this.conversationId;
-        this.streamUrl;
         this.client = this.createDiscordClient();
-        this.dlClient;
-        this.dlConnection;
+        this.dlClients = new Map();
         this.discordConfig = config.discordConfig || {};
         if (!this.discordConfig.disabledEvents) {
             this.discordConfig.disabledEvents = ['typingStart', 'typingStop'];
         }
         this.botId = config.botId;
         this.botName = config.botName;
-
-        /** TODO: Come up with a data store to use to handle conversations.
-         *  - Because Direct Line doesn't provide a recepient field when sending an Activity to the DiscordConnector.
-         */
-
-        // We're storing the discordChannel and discordUser so that we can take activities received from the bot and send them to Discord
-        this.discordChannel;
-        this.discordUser; 
-
         this.voiceReceiver;
     } 
 
@@ -65,19 +34,29 @@ class DiscordConnector {
     }
 
     /**
+     * Add a storage client to the Discord Connector instance
+     * @param {*} client 
+     */
+    addStorageClient (client) {
+        this.storageClient = client;
+        return this;
+    }
+
+    /**
      * Enables basic relay. Calls DiscordConnector.postActivity(). Automatically disregards messages that come from other Discord Bot Accounts. (Note this is Bots that have been designated as a "bot account" by Discord.) Does not need to be called if user wishes to implement custom Discord event handling.
      */
     enableBasicRelay () {
         if (!this.client) return new Error('DiscordConnector.enableBasicRelay - ERROR: Discord Client not found.');
-        if (!this.dlConnection) return new Error('DiscordConnector.enableBasicRelay - ERROR: Direct Line connection not found.');
         this.client.on('message', (msg) => {
             if (!msg.author.bot) {
-                if (!this.discordChannel || this.discordChannel != msg.channel) {
-                    this.discordChannel = msg.channel;
-                    this.discordUser = msg.author;
-                }
-                
-                this.postActivity(msg);          
+                this.getConversationData({}, msg).then(data => {
+                    console.log(data);
+                    var conversationId = this.getConversationId(data);
+                    console.log('Websocket connection successfully created for conversation ID: ' + conversationId);
+                    this.postActivity(msg, conversationId);
+                }).catch(err => {
+                    throw err;
+                })
             }
         });
     }
@@ -95,7 +74,6 @@ class DiscordConnector {
             },
             json: true
         }).then(res => {
-            this.conversationId = res.conversationId;
             this.token = res.token;
         });
     }
@@ -112,14 +90,74 @@ class DiscordConnector {
                 Authorization: 'Bearer ' + (this.token || this.dlSecret)
             },
             json: true
-        }).then(res => {
-            if (!this.token) this.token = res.token;
-            if (!this.conversationId) this.conversationId = res.conversationId;
-            this.streamUrl = res.streamUrl;
-        }).catch(err => {
-            console.log('DiscordConnector.createConversation - ERROR: Request to Direct Line failed.');
-            throw err;
-        })
+        });
+    }
+
+    /**
+     * 
+     * @param {*} activity 
+     * @param {*} event 
+     */
+    setConversationData (activity, event) {
+        if (!this.storageClient) throw new Error('You must provide a StorageClient to use the Connector!');
+        if (!activity || !event) throw new Error('You need both a Direct Line Conversation ID and a Discord Channel ID to save data!');
+        var data = this.storageClient.saveData(activity, event);
+        return data;
+    }
+
+    /**
+     * Attempts to retrieve the Direct Line Conversation ID when given with an activity or the Discord Channel ID when given an event. If a matching entry is not found, it creates a new entry.
+     * @param {*} activity 
+     * @param {*} event 
+     */
+    getConversationData (activity, event) {
+        if (!this.storageClient) throw new Error('You must provide a StorageClient to use the Connector!');
+        return new Promise ((resolve, reject) => {
+            this.storageClient.getData(activity, event, data => {
+                resolve(data);
+            })
+        }).then(data => {
+            if (!data || !data.id) {
+                return this.createConversation().then(dlResult => {
+                    console.log('dlResult:'); console.log(dlResult);
+                    this.setConversationData({ conversation: { id: dlResult.conversationId } }, event);
+                    this.dlWebSocketHandler(dlResult.conversationId, dlResult.streamUrl);
+                    return { id: dlResult.conversationId + '|' + event.channel.id };
+                });
+            } else if (data && data.id) {
+                return this.renewConversation(this.getConversationId(data)).then(dlResult => {
+                    if (!this.dlClients.get(dlResult.conversationId)) {
+                        this.dlWebSocketHandler(dlResult.conversationId, dlResult.streamUrl);
+                    }
+                    return data;
+                });
+            }
+            return data;
+        });
+    }
+
+    /**
+     * To be used with setConversationData and getConversationData
+     * To be used with getConversationData when sending an Activity from Direct Line to Discord
+     * @param {*} data 
+     * @returns {string}
+     */
+    getChannelId (data) {
+        if (!data) return;
+        var parsedIds = data.id.split('|');
+        return parsedIds.length > 1 ? parsedIds[1] : new Error();
+    }
+
+    /**
+     * To be used with setConversationData and getConversationData
+     * To be used with getConversationData when sending an event from Discord to Direct Line
+     * @param {*} data 
+     * @returns {string}
+     */
+    getConversationId (data) {
+        if (!data) return;
+        var parsedIds = data.id.split('|');
+        return parsedIds.length == 2 ? parsedIds[0] : new Error();
     }
 
     /**
@@ -196,6 +234,7 @@ class DiscordConnector {
             var richEmbed = new Discord.RichEmbed();
             var typeOfCard = att.contentType.split('application/vnd.microsoft.card.')[1];
             var data = att.content;
+            var simpleEmbed = {};
             
             if (data.title) richEmbed.setTitle(data.title);
             if (data.subtitle) richEmbed.setDescription(data.subtitle);
@@ -209,6 +248,7 @@ class DiscordConnector {
                     //
                     break;
                 case 'animation':
+                    // Gifs are supported
                     //
                     break;
                 case 'audio':
@@ -247,7 +287,19 @@ class DiscordConnector {
      * @param {*} attachment
      */
     embedGenerator (attachment) {
+        var attchs;
+        if (!attachment.content) {
+            var data = attachment;
+            if (data.media) {
+                attchs = data.media.map((url) => {
+                    return { url: url }
+                })
+                return attchs;
+            }
+        } else {
+            var data = attachment.content;
 
+        }
     }
 
     /**
@@ -328,93 +380,171 @@ class DiscordConnector {
     }
 
     /**
+     * Used to renew Direct Line Conversations. Returns a websocket URL.
+     * @param {string} conversationId
+     * @returns {*} 
+     */
+    renewConversation (conversationId) {
+        return rp({
+            url: 'https://directline.botframework.com/v3/directline/conversations/' + conversationId,
+            method: 'GET',
+            headers: {
+                Authorization: 'Bearer ' + (this.token || this.dlSecret)
+            },
+            json: true
+        }).then(res => {
+            if (!this.token) this.token = res.token;
+            return res
+        }).catch(err => {
+            console.log('DiscordConnector.renewConversation - ERROR: Request to Direct Line failed.');
+            throw err;
+        });
+    }
+
+    /**
      * Instantiates a new websocket connection using the streamUrl received from Direct Line.
      */
-    dlWebSocketHandler () {
-        console.log('Starting WebSocket Client for message streaming on conversationId: ' + this.conversationId);
+    dlWebSocketHandler (conversationId, streamUrl) {
+            console.log('Starting WebSocket Client for message streaming on conversationId: ' + conversationId);
 
-        return new Promise((resolve, reject) => {
-            this.dlClient = new (require('websocket').client)();
-            this.dlClient.on('connectFailed', (error) => {
-                console.log('DiscordConnector.dlWebSocketHandler - ERROR: ' + error.toString());
-                reject(error);
+            return new Promise((resolve, reject) => {
+                this.dlClients.set(conversationId, { 
+                    ws: new (require('websocket').client)(),
+                    connection: null
+                });
+                var dlSocket = this.dlClients.get(conversationId);
+
+                dlSocket.ws.on('connectFailed', err => {
+                    console.log('DiscordConnector.dlWebSocketHandler - ERROR: ' + err.toString());
+                    reject(err);
+                });
+
+                dlSocket.ws.on('connect', connection => {
+                    console.log('WebSocket Client Connected');
+
+                    dlSocket.connection = connection;
+                    dlSocket.connection.on('error',  err => {
+                        console.log("Connection Error: " + err.toString());
+                        reject(err);
+                    });
+                    dlSocket.connection.on('close',  () => {
+                        console.log('WebSocket Client Disconnected');
+                    });
+                    dlSocket.connection.on('message', msg => {
+                        if (msg.type === 'utf8' && msg.utf8Data.length > 0) {
+                            var data = JSON.parse(msg.utf8Data);
+                            var activities = data.activities;
+                            activities.forEach(activity => {
+                                if (activity.from.name == this.botName) return
+                            })
+                            for (var idx in activities) {
+                                var activity = activities[idx];
+                                
+                                this.getConversationData(activity, null).then(state => {
+                                    var channelId = this.getChannelId(state);
+                                    var channel = this.client.channels.get(channelId);
+                                    var embed;
+
+                                    if (activity.type == 'typing') {
+                                        channel.startTyping();
+                                        return;
+                                    };
+
+                                    if (Array.isArray(activity.attachments) && activity.attachments.length > 0) {
+                                        console.log('~~~\nLook at the attachments from the first activity received');
+                                        console.log(activities[0].attachments);
+                                        embed = this.dlAttachmentHandler(activity);
+                                        console.log('\nRight below me is the "embed":');
+                                        console.log(embed);                                     
+                                    }
+
+                                    if (embed instanceof Discord.RichEmbed) {
+                                        channel.send({ embed: embed }).catch((err) => {
+                                            console.log('ERROR IN DLWEBSOCKET ON SENDING RICH MEDIA FROM BOT');
+                                            console.log(err);
+                                        }) 
+                                    } else if (embed instanceof Array) {
+                                        embed.forEach((e) => {
+                                            channel.send({ embed: e }).catch((err) => {
+                                                console.log('ERROR IN DLWEBSOCKET ON SENDING RICH MEDIA FROM BOT');
+                                                console.log(err);
+                                            })
+                                        })
+                                    } else if (typeof embed == 'object') {
+                                        channel.send(embed);
+                                    } else if (Array.isArray(activity.attachments) && activity.attachments > 0) {
+                                        for (attachment in activity.attachments) {
+                                            channel.send({ file: attachment.contentUrl });
+                                        }
+                                    }
+
+                                    if (activity.text && !activity.attachments) {
+                                        channel.send(activity.text).catch((err) => {
+                                            throw err;
+                                        });
+                                    }
+                                }).catch(err => {
+                                    throw err;
+                                })
+                            }
+                        }
+                    });
+                });
+                dlSocket.ws.connect(streamUrl);
             });
+    }
 
-            this.dlClient.on('connect', (connection) => {
-                console.log('WebSocket Client Connected');
-                this.dlConnection = connection;
-                this.dlConnection.on('error',  (error) => {
-                    console.log("Connection Error: " + error.toString());
-                    reject(error);
-                });
-                this.dlConnection.on('close',  () => {
-                    console.log('WebSocket Client Disconnected');
-                });
-                this.dlConnection.on('message', (msg) => {
-                    if (msg.type === 'utf8' && msg.utf8Data.length > 0) {
-                        var data = JSON.parse(msg.utf8Data);
-                        var activities = data.activities;
-                        // This prevents any action from being undertaken on a message sent from this bot to a user.
-                        if (activities && activities[0].from.name != this.botName) return; 
+    /**
+     * This method needs to go inside of the event handlers for Discord Events. This event may need to be overloaded to account for all of the different types of events that go on...
+     * How would this look? Perhaps DiscordConnector.Guild = require('./Guild'); OR DiscordConnector.Guild = new (require('./Guild'));
+     */
+    postActivity (event, conversationId) {
+        var activity = {};
+        if (event.type == 'conversationUpdate') {
+            activity = event;
+        } else {
+            activity = {
+                from: {
+                    id: event.author.id,
+                    name: event.author.username
+                },
+                type: 'message',
+                text: this.processMention(event.content)
+            }
+            this.discordAttachmentHandler(event, activity);
+        }
+        return rp({
+            url: 'https://directline.botframework.com/v3/directline/conversations/' + conversationId + '/activities',
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + this.token || this.dlSecret },
+            body: activity,
+            json: true
+        }).then((res) => {
+            console.log('response from directline:\n' + JSON.stringify(res));
+        }).catch(err => {
+            console.error('DiscordConnector.dlWebSocketHandler - ERROR:');
+            throw err;
+        });
+    }
 
-                        if (activities && activities[0].type == 'typing') {
-                            this.discordChannel.startTyping();
-                            return;
-                        }
-                        console.log('~~~');
-                        if (activities && activities[0].recipient) {
-                            console.log('This is the activity\'s recipient');
-                            console.log(data.activities[0].recipient);
-                        }
+    /**
+     * This method takes activities from the DirectLine Connection and converts them to Discord Events 
+     */
+    postEvent (activity, channelId) {
+        // If the activity is not from the bot, we don't want to send an event from Discord (otherwise we're just repeating what we heard)
+        if (this.botName != activity.from.name) return;
+        
+        // How to get the channelID from the Activity Handler
+        // this.getConversationData(activity, null).then(data => {
+        //     var channelId = this.getChannelId(data);
 
-                        // activities is an array of activities, and activities[i].attachments is an array of attachments
-
-                        if (activities && activities[0].attachments) {
-                            var bot = this.client.user;
-                            var embed = this.dlAttachmentHandler(activities[0]);
-                            console.log('Right below me is the "embed":')
-                            console.log(embed);
-
-                            if (embed instanceof Discord.RichEmbed) {
-                                this.discordChannel.send({ embed: embed }).catch((err) => {
-                                    console.log('ERROR IN DLWEBSOCKET ON SENDING RICH MEDIA FROM BOT');
-                                    console.log(err);
-                                })
-                            }
-                            else if (embed instanceof Array) {
-                                embed.forEach((e) => {
-                                    this.discordChannel.send({ embed: e }).catch((err) => {
-                                        console.log('ERROR IN DLWEBSOCKET ON SENDING RICH MEDIA FROM BOT');
-                                        console.log(err);
-                                    })
-                                })
-                            }
-
-                            else if (typeof embed == 'object' && !(embed instanceof Discord.RichEmbed)) {
-                                this.discordChannel.send(embed);
-                            } else {
-                                this.discordChannel.send({ file: activities[0].attachments[0].contentUrl });
-                            }
-
-                            console.log('~~~\nLook at the attachments from the first activity received');
-                            console.log(activities[0].attachments);
-                        }
-
-                        if (activities && activities[0].from.name == this.botName && this.discordChannel /* If attachments from activity, skip this step. */ && !activities[0].attachments) {
-                            console.log('\nI send something to you.');
-                            if (activities && activities[0].text) {
-                                this.discordChannel.send(activities[0].text).catch((err) => {
-                                    console.log('ERROR IN DL WEBSOCKET');
-                                    console.error(err);
-                                })
-                            }
-                        }
-                    }
-                });
-                resolve(); // This needs adjusting
-            });
-            this.dlClient.connect(this.streamUrl);
-        })
+        //     var channel = this.client.channels.get(channelId);
+        //     channel.send(contentOrSomethingIdk).then(message => {
+        //         console.log('sent a message');
+        //     }).catch(err => {
+        //         throw err;
+        //     });
+        // });
     }
 
     activityAttachmentsHandler (activity, message) {
@@ -446,63 +576,7 @@ class DiscordConnector {
             } 
         });
     }
-
-    /**
-     * This method needs to go inside of the event handlers for Discord Events. This event may need to be overloaded to account for all of the different types of events that go on...
-     * How would this look? Perhaps DiscordConnector.Guild = require('./Guild'); OR DiscordConnector.Guild = new (require('./Guild'));
-     */
-    postActivity (event) {
-        var activity = {};
-        if (event.type == 'conversationUpdate') {
-            activity = event;
-        } else {
-            activity = {
-                from: {
-                    id: event.author.id,
-                    name: event.author.username
-                },
-                type: 'message',
-                text: this.processMention(event.content)
-            }
-            this.discordAttachmentHandler(event, activity);
-        }
-
-        return rp({
-            url: 'https://directline.botframework.com/v3/directline/conversations/' + this.conversationId + '/activities',
-            method: 'POST',
-            headers: { Authorization: 'Bearer ' + this.dlSecret },
-            body: activity,
-            json: true
-        }).then((res) => {
-            console.log('response from directline:\n' + JSON.stringify(res));
-        });
-    }
-
-    /**
-     * This method takes activities from the DirectLine Connection and converts them to Discord Events 
-     * This event may need to be overloaded to account for all of the different types of events that go on...
-     * Or perhaps another class needs to be created to handle guild events, user events, and so on and so forth...
-     * How would this look? Perhaps DiscordConnector.Guild = require('./Guild'); OR DiscordConnector.Guild = new (require('./Guild'));
-     * & DiscordConnector.Message = require('./Message'); OR DiscordConnector.Message = new (require('./Message'));
-     * & DiscordConnector.Channel = require('./Channel'); OR DiscordConnector.Channel = new (require('./Channel'));
-     */
-    postEvent (activity) {
-        // If the activity is not from the bot, we don't want to send an event from Discord (otherwise we're just repeating what we heard)
-        if (this.botName != activity.from.name) return;
-    }
-
-    /**
-     * WIP: Need to figure out which user to delete if more than one user exists in the conversation. Not implemented due to the lack of multiple user data store.
-     * @param {string} activityType 
-     */
-    deleteUserData (activityType) {
-        if (activityType == 'deleteUserData') {
-            if (this.client.users.get) {
-
-            }
-        }
-    }
-
+    
     /**
      * Helper function that returns attachment's MIME-type via file extension provided by Discord
      * @param {string} filename 
@@ -524,91 +598,6 @@ class DiscordConnector {
             return;
         }
         return filename;
-    }
-
-    /**
-     * Adds listener to Discord Client for bot to join user's voice channel on command.
-     * If not provided, `prefix` defaults to "!". `postActivity` defaults to true, sending the command to bot. 
-     * @param {string} prefix 
-     * @param {boolean} postActivity
-     */
-    joinVoiceChannelOnCommand (prefix = '!', postActivity = true) {
-        this.client.on('message', (msg) => {
-            console.log('Listener in place.');
-            if (!msg.author.bot) {
-                console.log('user is not bot');
-                if (msg.member.voiceChannel && msg.member.voiceChannel.joinable) {
-                    msg.member.voiceChannel.join()
-                    .then(voiceConnection => {
-                        this.voiceConnection = voiceConnection;
-                        this.voiceReceiver = voiceConnection.createReceiver();
-                        this.voiceStream = this.voiceReceiver.createPCMStream(msg.author);
-                        var data;
-
-                        var bingSpeech = require('bingspeech-api-client');
-                        var client = new bingSpeech.BingSpeechClient('8d925ceb8676441ab73c21494f3d96fc');
-                        var encoder = new lame.Encoder({
-                            channels: 2,
-                            bitDepth: 16,
-
-                            bitRate: 128,
-                            mode: lame.STEREO
-                        })
-                        this.voiceStream.pipe(encoder);
-
-                        encoder.on('data', chunk => {
-                            encoder.push(chunk);
-                            console.log('encoder.on("data"): ' + chunk);
-                        })
-
-                        // var duplexStream = new stream.Duplex()
-                        // duplexStream._read = function (data, enc, callback) {
-                        //     duplexStream.push(data);
-                        // }
-
-                        // duplexStream._write = function (data, enc, next) {
-                        //     duplexStream.push(data);
-                        //     next();
-                        // }
-                        // this.voiceStream.pipe(duplexStream); 
-
-                        ffmpeg(this.voiceStream)
-                            .inputFormat('s32le')
-                            .audioFrequency(16000)
-                            .audioChannels(1)
-                            .audioCodec('pcm_s16le')
-                            .format('s16le')
-                            .on('error', err => { throw err; })
-                            .pipe(encoder)
-                        
-                        this.voiceReceiver.on('pcm', (user, buffer) => {
-                            data += buffer.toString('utf8');
-                        });
-                        this.voiceConnection.on('speaking', (userSpeaking) => {
-                            if (userSpeaking) {
-                                console.log('Someone is speaking!');
-                            }
-                            if (!userSpeaking) {
-                                console.log('Someone isn\'t speaking...');
-                            }
-                        });
-                        
-                    })
-                    .catch(err => {
-                        console.error('L608 DiscordConnector.joinVoiceChannelOnCommand - ERROR: ' + err);
-                        throw err;
-                    })
-                }
-                if (!this.discordChannel || this.discordChannel != msg.channel) {
-                    this.discordChannel = msg.channel;
-                    this.discordUser = msg.author;
-                }
-
-                if (msg.content.includes(prefix + 'join-v')) {
-                    msg.reply('I am here!');
-                }
-            }
-        })
     }
 }
 

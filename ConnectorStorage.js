@@ -72,12 +72,12 @@ class ConnectorStorage {
     }
 
     /**
-     * To save the conversationId-channelId configuration
+     * To save the conversationId-channelId configuration. It pains me immensely that this method still requires a callback.
      * @param {*} activity 
      * @param {*} event
      * @returns {any} Actually a document db entry atm. 
      */
-    saveData(activity, event) {
+    saveData(activity, event, callback) {
         var conversationId = '';
         var channelId = '';
 
@@ -92,7 +92,7 @@ class ConnectorStorage {
         this.documentdbClient.upsertDocument(this.collection._self, newDataEntry, {}, (err, collection, responseHeaders) => {
             if (err) this.getError(err);
             if (collection) {
-                return collection;
+                callback(collection);
             }
         })
     }

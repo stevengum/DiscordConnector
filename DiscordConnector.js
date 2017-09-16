@@ -50,10 +50,14 @@ class DiscordConnector {
         this.client.on('message', (msg) => {
             if (!msg.author.bot) {
                 this.getConversationData({}, msg).then(data => {
-                    console.log(data);
                     var conversationId = this.getConversationId(data);
-                    console.log('Websocket connection successfully created for conversation ID: ' + conversationId);
-                    this.postActivity(msg, conversationId);
+                    console.log('DiscordConnector - Message received from user in conversation: ' + conversationId);
+                    // var token = this.client.channels.get(conversationId).token;
+                    this.postActivity(msg, conversationId)
+                        .catch(err => {
+                            console.error('DiscordConnector.dlWebSocketHandler - ERROR:');
+                            throw err;
+                        });
                 }).catch(err => {
                     throw err;
                 })
@@ -87,7 +91,7 @@ class DiscordConnector {
             url: 'https://directline.botframework.com/v3/directline/conversations',
             method: 'POST',
             headers: {
-                Authorization: 'Bearer ' + (this.token || this.dlSecret)
+                Authorization: 'Bearer ' + this.dlSecret
             },
             json: true
         });
@@ -101,8 +105,11 @@ class DiscordConnector {
     setConversationData (activity, event) {
         if (!this.storageClient) throw new Error('You must provide a StorageClient to use the Connector!');
         if (!activity || !event) throw new Error('You need both a Direct Line Conversation ID and a Discord Channel ID to save data!');
-        var data = this.storageClient.saveData(activity, event);
-        return data;
+        return new Promise((resolve, reject) => {
+            var data = this.storageClient.saveData(activity, event, data => {
+                resolve(data);
+            });
+        })
     }
 
     /**
@@ -111,29 +118,32 @@ class DiscordConnector {
      * @param {*} event 
      */
     getConversationData (activity, event) {
-        if (!this.storageClient) throw new Error('You must provide a StorageClient to use the Connector!');
+        if (!this.storageClient) throw new Error('DiscordConnector.getConversationData - ERROR: You must provide a StorageClient to use the Connector!');
         return new Promise ((resolve, reject) => {
             this.storageClient.getData(activity, event, data => {
-                resolve(data);
+                if (!data || !data.id) {
+                    return this.createConversation().then(dlResult => {
+                        this.setConversationData({ conversation: { id: dlResult.conversationId } }, event)
+                            .then(data => {
+                                this.dlWebSocketHandler(dlResult.conversationId, dlResult.streamUrl);
+                                resolve({ id: dlResult.conversationId + '|' + event.channel.id });
+    
+                            })
+                            .catch(err => {
+                                console.log('DiscordConnector.getConversationData - ERROR:');
+                                throw err;
+                            })
+                    });
+                } else if (data && data.id) {
+                    return this.renewConversation(this.getConversationId(data)).then(dlResult => {
+                        if (!this.dlClients.get(dlResult.conversationId)) {
+                            this.dlWebSocketHandler(dlResult.conversationId, dlResult.streamUrl);
+                        }
+                        resolve(data);
+                    });
+                }    
             })
-        }).then(data => {
-            if (!data || !data.id) {
-                return this.createConversation().then(dlResult => {
-                    console.log('dlResult:'); console.log(dlResult);
-                    this.setConversationData({ conversation: { id: dlResult.conversationId } }, event);
-                    this.dlWebSocketHandler(dlResult.conversationId, dlResult.streamUrl);
-                    return { id: dlResult.conversationId + '|' + event.channel.id };
-                });
-            } else if (data && data.id) {
-                return this.renewConversation(this.getConversationId(data)).then(dlResult => {
-                    if (!this.dlClients.get(dlResult.conversationId)) {
-                        this.dlWebSocketHandler(dlResult.conversationId, dlResult.streamUrl);
-                    }
-                    return data;
-                });
-            }
-            return data;
-        });
+        })
     }
 
     /**
@@ -389,7 +399,7 @@ class DiscordConnector {
             url: 'https://directline.botframework.com/v3/directline/conversations/' + conversationId,
             method: 'GET',
             headers: {
-                Authorization: 'Bearer ' + (this.token || this.dlSecret)
+                Authorization: 'Bearer ' + this.dlSecret
             },
             json: true
         }).then(res => {
@@ -420,15 +430,15 @@ class DiscordConnector {
                 });
 
                 dlSocket.ws.on('connect', connection => {
-                    console.log('WebSocket Client Connected');
+                    console.log('DiscordConnector.dlWebSocketHandler - WebSocket Client connected for conversation ' + conversationId);
 
                     dlSocket.connection = connection;
                     dlSocket.connection.on('error',  err => {
-                        console.log("Connection Error: " + err.toString());
+                        console.log("DiscordConnector.dlWebSocketHandler - Connection Error: " + err.toString());
                         reject(err);
                     });
                     dlSocket.connection.on('close',  () => {
-                        console.log('WebSocket Client Disconnected');
+                        console.log('DiscordConnector.dlWebSocketHandler - WebSocket Client disconnected');
                     });
                     dlSocket.connection.on('message', msg => {
                         if (msg.type === 'utf8' && msg.utf8Data.length > 0) {
@@ -516,15 +526,10 @@ class DiscordConnector {
         return rp({
             url: 'https://directline.botframework.com/v3/directline/conversations/' + conversationId + '/activities',
             method: 'POST',
-            headers: { Authorization: 'Bearer ' + this.token || this.dlSecret },
+            headers: { Authorization: 'Bearer ' + this.dlSecret },
             body: activity,
             json: true
-        }).then((res) => {
-            console.log('response from directline:\n' + JSON.stringify(res));
-        }).catch(err => {
-            console.error('DiscordConnector.dlWebSocketHandler - ERROR:');
-            throw err;
-        });
+        })
     }
 
     /**

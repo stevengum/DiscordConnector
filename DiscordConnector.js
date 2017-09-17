@@ -34,7 +34,7 @@ class DiscordConnector {
     }
 
     /**
-     * Add a storage client to the Discord Connector instance
+     * Adds an instantiated ConnectorStorage to the Discord Connector instance
      * @param {*} client 
      */
     addStorageClient (client) {
@@ -127,7 +127,6 @@ class DiscordConnector {
                             .then(data => {
                                 this.dlWebSocketHandler(dlResult.conversationId, dlResult.streamUrl);
                                 resolve({ id: dlResult.conversationId + '|' + event.channel.id });
-    
                             })
                             .catch(err => {
                                 console.log('DiscordConnector.getConversationData - ERROR:');

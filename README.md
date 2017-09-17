@@ -6,9 +6,11 @@ ___
 
 ## Description:
 
-**DiscordConnector** allows bots written using **[Microsoft's Bot Framework][botframework]** to be used in the popular VoIP client, **[Discord][discordapp]**. **DC** uses the Bot Framework's **[Direct Line API][directline]** to connect a Bot Framework Bot to Discord. This connector implements **[Discord.js][discord.js]** to map Direct Line's Activity objects to Discord-consumable events.
+**DiscordConnector** allows bots written using **[Microsoft's Bot Framework][botframework]** to be used in the popular VoIP client, **[Discord][discordapp]**. DiscordConnector uses the Bot Framework's **[Direct Line API][directline]** to connect a Bot Framework Bot to Discord. This connector implements **[Discord.js][discord.js]** to map Direct Line's Activity objects to Discord-consumable events.
 
+The **ConnectorStorage** provides multiple conversation support. A succinct description is that the DiscordConnector uses an external storage to store Direct Line Conversationi ID and Discord Channel ID pairings; this allows your users to continue conversations with their bot.
 
+The **DiscordHelperModule** focuses on providing Discord-specific functionalities and commands, e.g. having a bot join or leave a channel, getting a list of users from the Discord.js client, etc.  
 
 ___
 
@@ -31,6 +33,8 @@ npm install
 - Users should __only__ format their bot's messages in markdown as this is [Discord's supported markup language][discordmarkup].
 - __NOTE:__ Discord does not support buttons or similiar forms of data input in their RichEmbeds.
 
+## Special Thanks:
+- Thank you to [**hydrabolt**][hydrabolt] for the [Discord.js][discord.jsGitHub] library.
 
 ### Other Information:
 - You can provide feedback to Discord via their [forums][discordfeedback]!
@@ -44,6 +48,8 @@ npm install
   [discordapp]: https://discordapp.com
   [directline]: https://docs.microsoft.com/en-us/bot-framework/rest-api/bot-framework-rest-direct-line-3-0-concepts
   [discord.js]: https://discord.js.org
+  [hydrabolt]: https://github.com/hydrabolt
+  [discord.jsGitHub]: https://github.com/hydrabolt/discord.js/
   [discord.jsissues]: https://github.com/hydrabolt/discord.js/issues
   [Discordv11.1.0]: https://github.com/hydrabolt/discord.js/releases/tag/11.1.0
   [Discordv11.1.0Download]: https://github.com/hydrabolt/discord.js/archive/11.1.0.zip

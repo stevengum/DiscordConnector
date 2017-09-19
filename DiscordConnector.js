@@ -430,7 +430,9 @@ class DiscordConnector {
 
                 dlSocket.ws.on('connectFailed', err => {
                     console.log('DiscordConnector.dlWebSocketHandler - ERROR: ' + err.toString());
-                    reject(err);
+                    this.dlClients.delete(conversationId);
+                    if (this.dlClients.has(conversationId)) reject('DiscordConnector.dlWebSocketHandler - ERROR: Attempt to delete conversation ' + conversationId + ' from local cache has been unsuccessful.');
+                    else console.log('Conversation ' + conversationId + ' successfully deleted from local cache.');
                 });
 
                 dlSocket.ws.on('connect', connection => {
@@ -443,6 +445,9 @@ class DiscordConnector {
                     });
                     dlSocket.connection.on('close',  () => {
                         console.log('DiscordConnector.dlWebSocketHandler - WebSocket Client disconnected');
+                        this.dlClients.delete(conversationId);
+                        if (this.dlClients.has(conversationId)) reject('DiscordConnector.dlWebSocketHandler - ERROR: Attempt to delete conversation ' + conversationId + ' from local cache has been unsuccessful.');
+                        else console.log('Conversation ' + conversationId + ' successfully deleted from local cache.');
                     });
                     dlSocket.connection.on('message', msg => {
                         if (msg.type === 'utf8' && msg.utf8Data.length > 0) {

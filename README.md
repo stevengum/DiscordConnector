@@ -34,6 +34,10 @@ npm install
 - __NOTE:__ Discord does not support buttons or similiar forms of data input in their RichEmbeds. If a button type is one of those found here under [cardActionTypes][cardActionTypes], then the value of the message (if an URL) will be added to the card.
 - Discord currently supports [one attachment per message][oneAttachmentLimit].
 
+### Examples:
+- [Basic Example on how to set up a DiscordConnector instance.][example_1]
+___
+
 ## Special Thanks:
 - Thank you to [**hydrabolt**][hydrabolt] for the [Discord.js][discord.jsGitHub] library.
 
@@ -61,3 +65,4 @@ npm install
   [wikihow/ffmpeg]: http://www.wikihow.com/Install-FFmpeg-on-Windows
   [cardActionTypes]: ./Consts.js
   [oneAttachmentLimit]: https://feedback.discordapp.com/forums/326712-discord-dream-land/suggestions/17614645-attach-multiple-photos-to-messages-and-choose-if-t
+  [example_1]: ./examples/example.js

@@ -53,11 +53,7 @@ class DiscordConnector {
                     var conversationId = this.getConversationId(data);
                     console.log('DiscordConnector - Message received from user in conversation: ' + conversationId);
                     // var token = this.client.channels.get(conversationId).token;
-                    this.postActivity(msg, conversationId)
-                        .catch(err => {
-                            console.error('DiscordConnector.dlWebSocketHandler - ERROR:');
-                            throw err;
-                        });
+                    this.postActivity(msg, conversationId);
                 }).catch(err => {
                     throw err;
                 })
@@ -535,20 +531,17 @@ class DiscordConnector {
      * This method takes activities from the DirectLine Connection and converts them to Discord Events 
      */
     postEvent (activity, channelId) {
-        // If the activity is not from the bot, we don't want to send an event from Discord (otherwise we're just repeating what we heard)
         if (this.botName != activity.from.name) return;
         
-        // How to get the channelID from the Activity Handler
-        // this.getConversationData(activity, null).then(data => {
-        //     var channelId = this.getChannelId(data);
+        this.getConversationData(activity, {}).then(data => {
+            var channelId = this.getChannelId(data);
+            var channel = this.client.channels.get(channelId);
 
-        //     var channel = this.client.channels.get(channelId);
-        //     channel.send(contentOrSomethingIdk).then(message => {
-        //         console.log('sent a message');
-        //     }).catch(err => {
-        //         throw err;
-        //     });
-        // });
+            channel.send(activity)
+                .catch(err => {
+                    throw err;
+                });
+        });
     }
 
     activityAttachmentsHandler (activity, message) {
@@ -582,11 +575,11 @@ class DiscordConnector {
     }
     
     /**
-     * Helper function that returns attachment's MIME-type via file extension provided by Discord
+     * Helper function that returns attachment's MIME-type via file extension provided by Discord. Defaults to 'application/octet-stream'
      * @param {string} filename 
      */
     getContentType (filename) {
-        return mime.lookup(filename) ? mime.lookup(filename) : 'unknown/unknown';
+        return mime.lookup(filename) ? mime.lookup(filename) : 'application/octet-stream';
     }
 
     /**

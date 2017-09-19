@@ -1,6 +1,7 @@
 const rp = require('request-promise');
 const Discord = require('discord.js');
 const mime = require('mime-types');
+const Consts = require('./Consts');
 
 /**
  * Class that holds both the Direct Line websocket clients and the Discord client.
@@ -174,9 +175,10 @@ class DiscordConnector {
         var atts = message.attachments;
         var keys = atts.keyArray();
         if (keys) {
-            if (!activity.attachments) activity.attachments = []; // This should be removed and inside of the forEach-loop an array is created if an array of attachments doesn't exist on the activity.
             keys.forEach((key) => {
                 var att = atts.get(key);
+                if (!activity.attachments) activity.attachments = [];
+                
                 activity.attachments.push({
                     contentType: this.getContentType(this.discordUrlParser(att.proxyURL)),
                     contentUrl: att.proxyURL,
@@ -192,37 +194,41 @@ class DiscordConnector {
      * https://feedback.discordapp.com/forums/326712-discord-dream-land/suggestions/17614645-attach-multiple-photos-to-messages-and-choose-if-t
      * @param {*} activity 
      */
-    dlAttachmentHandler (activity) {
-        if (activity.attachmentLayout == 'carousel') console.log('WARN: carousel attachment layout not supported in Discord'); 
+    activityAttachmentsHandler (activity) {
+        if (activity.attachmentLayout == 'carousel') console.warn('DiscordConnector.activityAttachmentsHandler - WARN: carousel attachment layout not supported in Discord'); 
         var attachments = [];
 
-        activity.attachments.forEach((att) => {
-            // Examines received attachments to see if they are a RichCard
-            var richEmbed = this.richEmbedGenerator(att);
+        if (Array.isArray(activity.attachments)) {
+            activity.attachments.forEach((att) => {
+                // Examines received attachments to see if they are a RichCard
+                var richEmbed = this.richEmbedGenerator(att);
 
-            if (richEmbed) attachments.push(richEmbed);
-            else if (Array.isArray(richEmbed)) attachments.concat(richEmbed);
-            else {
-                var file = {
-                    file: att.contentUrl
-                }
-                attachments = file;
-                return file;
-            }
-
-            if (att.contentType == 'image/png') {
-                var image = new Discord.RichEmbed({
-                    image: {
-                        url: att.contentUrl,
-                        proxyURL: att.contentUrl
+                if (richEmbed) attachments.push(richEmbed);
+                else if (Array.isArray(richEmbed)) attachments.concat(richEmbed);
+                else {
+                    var file = {
+                        file: att.contentUrl
                     }
-                })
-                console.log(image);
-                attachments = image;
-                
-                return image;
-            }
-        });
+                    attachments = file;
+                    return file;
+                }
+
+                if (/image\//.test(att.contentType)) {
+                    var image = new Discord.RichEmbed({
+                        image: {
+                            url: att.contentUrl,
+                            proxyURL: att.contentUrl
+                        }
+                    });
+                    attachments.push(image);
+                }
+
+                if (/audio\//.test(att.contentType) || /video\//.test(att.contentType)) {
+                    console.warn('DiscordConnector.activityAttachmentsHandler - WARN: Discord does not provide a player for audio or video files. Converting attachment to plain-text message with contentUrl.');
+                    attachments.push({ content: att.contentUrl });
+                }
+            });
+        }
         return attachments;
     }
 
@@ -235,7 +241,7 @@ class DiscordConnector {
         var att = attachment;
         if (!attachment) return;
 
-        if (/application\/vnd.microsoft.card/.test(att.contentType)) {
+        if (/application\/vnd\.microsoft\.card\./.test(att.contentType)) {
             var richEmbed = new Discord.RichEmbed();
             var typeOfCard = att.contentType.split('application/vnd.microsoft.card.')[1];
             var data = att.content;
@@ -248,21 +254,20 @@ class DiscordConnector {
             switch (typeOfCard) {
                 case 'adaptive':
                     console.warn('DiscordConnector.richEmbedGenerator - WARN: Adaptive Cards not yet supported at this time.\nDown-rendering using to use formatting for HeroCards.');
+                case 'thumbnail':
                 case 'hero':
-                    if (data.images) richEmbed.setImage(data.images[0].url);
-                    //
-                    break;
+                if (data.images) richEmbed.setImage(data.images[0]['url']);
+                if (data.images.length > 1) console.error(new Error('DiscordConnector.richEmbedGenerator - ERROR: Discord RichEmbeds only support one image.'));
+                break;
                 case 'animation':
-                    // Gifs are supported
-                    //
+                    richEmbed.setTitle(data.title + ' (Animated File)');
+                    richEmbed.setImage(data.image.url);
+                    if (data.media) richEmbed.setURL(data.media[0]['url']);
                     break;
                 case 'audio':
-                    console.error(new Error('DiscordConnector.richEmbedGenerator - ERROR: Discord does not support the playing of audio files.'));
-                    break;
-                case 'thumbnail':
-                    if (data.images) richEmbed.setImage(data.images[0].url);
-                    if (data.images.length > 1) console.error(new Error('DiscordConnector.richEmbedGenerator - ERROR: Discord RichEmbeds only support one image.'));
-                    //
+                    richEmbed.setURL(data.media[0]['url']);
+                    richEmbed.setTitle(data.title + ' (Audio File)');
+                    console.error(new Error('DiscordConnector.richEmbedGenerator - ERROR: Discord does not support the playing of audio files.')); 
                     break;
                 case 'receipt':
                     //
@@ -272,17 +277,23 @@ class DiscordConnector {
                     break;
                 case 'video':
                     console.warn('DiscordConnector.richEmbedGenerator - WARN: Discord richEmbeds do not support video media. Down rendering to a simple embed. Data may be lost.');
-                    if (data.image && data.image.url) richEmbed.setImage(data.image.url); // Not sure if this is only video card that accepts one image.
-                    if (data.media[0] && data.media[0].url) richEmbed.something;
-                    var VideoEmbed = { }
-                    VideoEmbed.url = data.media[0].url;
+                    if (data.image && data.image.url) richEmbed.setImage(data.image.url); 
+                    richEmbed.setTitle(data.title + ' (Video File)');
+                    if (data.media && data.media[0]) richEmbed.setURL(data.media[0]['url'])
                     break;  
                 default:
                     richEmbed = null;
                     console.error(new Error('DiscordConnector.discordEmbedGenerator() - ERROR: Card type not recognized.'));
             }
 
-            // attachments.push(richEmbed);
+            if (!richEmbed.url && data.buttons) {
+                console.warn('DiscordConnector.richEmbedGenerator - WARN: Discord does not have a Rich Card button equivalency. The first URL will attached to the richEmbed.');
+                var cardTypeRegExp = new RegExp(Consts.cardActionTypes, 'i');
+                if (cardTypeRegExp.test(data.buttons[0]['type']) && /https?:\/\/.*.*/.test(data.buttons[0]['value'])) {
+                    richEmbed.setURL(data.buttons[0]['value']);
+                }
+            }
+
             return richEmbed;
         }
     }
@@ -448,46 +459,8 @@ class DiscordConnector {
                                 this.getConversationData(activity, null).then(state => {
                                     var channelId = this.getChannelId(state);
                                     var channel = this.client.channels.get(channelId);
-                                    var embed;
 
-                                    if (activity.type == 'typing') {
-                                        channel.startTyping();
-                                        return;
-                                    };
-
-                                    if (Array.isArray(activity.attachments) && activity.attachments.length > 0) {
-                                        console.log('~~~\nLook at the attachments from the first activity received');
-                                        console.log(activities[0].attachments);
-                                        embed = this.dlAttachmentHandler(activity);
-                                        console.log('\nRight below me is the "embed":');
-                                        console.log(embed);                                     
-                                    }
-
-                                    if (embed instanceof Discord.RichEmbed) {
-                                        channel.send({ embed: embed }).catch((err) => {
-                                            console.log('ERROR IN DLWEBSOCKET ON SENDING RICH MEDIA FROM BOT');
-                                            console.log(err);
-                                        }) 
-                                    } else if (embed instanceof Array) {
-                                        embed.forEach((e) => {
-                                            channel.send({ embed: e }).catch((err) => {
-                                                console.log('ERROR IN DLWEBSOCKET ON SENDING RICH MEDIA FROM BOT');
-                                                console.log(err);
-                                            })
-                                        })
-                                    } else if (typeof embed == 'object') {
-                                        channel.send(embed);
-                                    } else if (Array.isArray(activity.attachments) && activity.attachments > 0) {
-                                        for (attachment in activity.attachments) {
-                                            channel.send({ file: attachment.contentUrl });
-                                        }
-                                    }
-
-                                    if (activity.text && !activity.attachments) {
-                                        channel.send(activity.text).catch((err) => {
-                                            throw err;
-                                        });
-                                    }
+                                    this.postEvent(activity, channelId);
                                 }).catch(err => {
                                     throw err;
                                 })
@@ -528,28 +501,37 @@ class DiscordConnector {
     }
 
     /**
-     * This method takes activities from the DirectLine Connection and converts them to Discord Events 
+     * This method takes activities from the DirectLine Connection and converts them to Discord Events. Verifies against cached botName so that the connector only translates and sends Activities received from the bot.
+     * @param {*} activity
+     * @param {string} channelId
+     * @returns {void} 
      */
     postEvent (activity, channelId) {
-        if (this.botName != activity.from.name) return;
-        
-        this.getConversationData(activity, {}).then(data => {
-            var channelId = this.getChannelId(data);
-            var channel = this.client.channels.get(channelId);
+        if (this.botName && this.botName != activity.from.name) return;
 
-            channel.send(activity)
+        var channel = this.client.channels.get(channelId);
+        
+        if (activity.type == 'typing') {
+            channel.startTyping();
+            return;
+        }
+        
+        var msgWithAttachments = this.activityAttachmentsHandler(activity);
+        if (activity.text) {
+            var textMsg = activity.text;
+
+            msgWithAttachments.unshift(textMsg);
+        }
+
+        msgWithAttachments.forEach(msg => {
+            if (typeof msg !== 'string') {
+                msg = { embed: msg };
+            } 
+            channel.send(msg)
                 .catch(err => {
                     throw err;
                 });
         });
-    }
-
-    activityAttachmentsHandler (activity, message) {
-        if (Array.isArray(activity.attachments) && activity.attachments.length > 0) {
-            activity.attachments.forEach((att) => {
-
-            })
-        }
     }
 
     /**

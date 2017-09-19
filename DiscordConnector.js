@@ -190,8 +190,6 @@ class DiscordConnector {
     
     /**
      * Converts Activity.Attachments to Discord-ready attachments. Calls DiscordConnector.richEmbedGenerator().
-     * RIGHT NOW DISCORD ALLOWS A SINGLE PHOTO(ATTACHMENT?) PER MESSAGE
-     * https://feedback.discordapp.com/forums/326712-discord-dream-land/suggestions/17614645-attach-multiple-photos-to-messages-and-choose-if-t
      * @param {*} activity 
      */
     activityAttachmentsHandler (activity) {
@@ -256,8 +254,8 @@ class DiscordConnector {
                     console.warn('DiscordConnector.richEmbedGenerator - WARN: Adaptive Cards not yet supported at this time.\nDown-rendering using to use formatting for HeroCards.');
                 case 'thumbnail':
                 case 'hero':
-                if (data.images) richEmbed.setImage(data.images[0]['url']);
-                if (data.images.length > 1) console.error(new Error('DiscordConnector.richEmbedGenerator - ERROR: Discord RichEmbeds only support one image.'));
+                    if (data.images) richEmbed.setImage(data.images[0]['url']);
+                    if (data.images.length > 1) console.error(new Error('DiscordConnector.richEmbedGenerator - ERROR: Discord RichEmbeds only support one image.'));
                 break;
                 case 'animation':
                     richEmbed.setTitle(data.title + ' (Animated File)');

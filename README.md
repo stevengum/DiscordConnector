@@ -1,6 +1,6 @@
 # DiscordConnector 
 
-#### Version 0.7.1
+#### Version 0.7.2
 
 ___
 
@@ -31,7 +31,8 @@ npm install
 ### Details:
 - This version of the DiscordConnector was built with [Discord.js v11.1.0][Discordv11.1.0] (Discord.js [.zip][Discordv11.1.0Download] and [.tar.gz][Discordv11.1.0Download.tar.gz]) 
 - Users should __only__ format their bot's messages in markdown as this is [Discord's supported markup language][discordmarkup].
-- __NOTE:__ Discord does not support buttons or similiar forms of data input in their RichEmbeds.
+- __NOTE:__ Discord does not support buttons or similiar forms of data input in their RichEmbeds. If a button type is one of those found here under [cardActionTypes][cardActionTypes], then the value of the message (if an URL) will be added to the card.
+- Discord currently supports [one attachment per message][oneAttachmentLimit].
 
 ## Special Thanks:
 - Thank you to [**hydrabolt**][hydrabolt] for the [Discord.js][discord.jsGitHub] library.
@@ -58,3 +59,5 @@ npm install
   [discordfeedback]: https://feedback.discordapp.com/forums/326712-discord-dream-land
   [adaptlearning/ffmpeg]: https://github.com/adaptlearning/adapt_authoring/wiki/Installing-FFmpeg
   [wikihow/ffmpeg]: http://www.wikihow.com/Install-FFmpeg-on-Windows
+  [cardActionTypes]: ./Consts.js
+  [oneAttachmentLimit]: https://feedback.discordapp.com/forums/326712-discord-dream-land/suggestions/17614645-attach-multiple-photos-to-messages-and-choose-if-t

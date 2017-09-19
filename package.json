@@ -1,6 +1,6 @@
 {
   "name": "discord_bot_framework",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Discord-Bot Framework connector that uses Discord.js and Bot Framework's Direct Line to connect Bot Framework bots to Discord.",
   "main": "index.js",
   "scripts": {

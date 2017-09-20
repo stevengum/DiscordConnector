@@ -1,19 +1,34 @@
 {
-  "name": "discord_bot_framework",
+  "name": "discordconnector",
   "version": "0.7.2",
   "description": "Discord-Bot Framework connector that uses Discord.js and Bot Framework's Direct Line to connect Bot Framework bots to Discord.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "chatbots",
+    "botbuilder",
+    "botframework",
+    "directline",
+    "discord",
+    "discord.js"
+  ],
   "author": "Steven Gum",
+  "bugs" : {
+    "url": "https://github.com/stevengum97/DiscordConnector/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stevengum97/DiscordConnector.git"
+  },
   "license": "MIT",
   "dependencies": {
     "discord.js": "11.1.0",
     "mime-types": "2.1.16",
     "request": "2.81.0",
     "request-promise": "4.2.1",
-    "websocket": "1.0.24"
+    "websocket": "1.0.24",
+    "uws": "8.14.1"
   }
 }

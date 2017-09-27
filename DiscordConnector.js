@@ -30,6 +30,9 @@ class DiscordConnector {
     createDiscordClient () {
         if (!this.discordSecret) throw new Error('DiscordConnector.createDiscordClient - ERROR: Discord bot secret not found. Unable to complete connection to Discord servers.');
         var client = new Discord.Client(this.discordConfig).on('ready', () => { console.log('Connected to Discord Servers.')});
+        client.on('error', err => {
+            console.log(error);
+        });
         client.login(this.discordSecret);
         return client;
     }
@@ -119,7 +122,7 @@ class DiscordConnector {
         return new Promise ((resolve, reject) => {
             this.storageClient.getData(activity, event, data => {
                 if (!data || !data.id) {
-                    return this.createConversation().then(dlResult => {
+                    this.createConversation().then(dlResult => {
                         this.setConversationData({ conversation: { id: dlResult.conversationId } }, event)
                             .then(data => {
                                 this.dlWebSocketHandler(dlResult.conversationId, dlResult.streamUrl);
@@ -131,7 +134,7 @@ class DiscordConnector {
                             })
                     });
                 } else if (data && data.id) {
-                    return this.renewConversation(this.getConversationId(data)).then(dlResult => {
+                    this.renewConversation(this.getConversationId(data)).then(dlResult => {
                         if (!this.dlClients.get(dlResult.conversationId)) {
                             this.dlWebSocketHandler(dlResult.conversationId, dlResult.streamUrl);
                         }
@@ -407,8 +410,7 @@ class DiscordConnector {
             },
             json: true
         }).then(res => {
-            if (!this.token) this.token = res.token;
-            return res
+            return res;
         }).catch(err => {
             console.log('DiscordConnector.renewConversation - ERROR: Request to Direct Line failed.');
             throw err;
@@ -454,7 +456,7 @@ class DiscordConnector {
                             var data = JSON.parse(msg.utf8Data);
                             var activities = data.activities;
                             activities.forEach(activity => {
-                                if (activity.from.name == this.botName) return
+                                if (activity.from.name == this.botName) return;
                             })
                             for (var idx in activities) {
                                 var activity = activities[idx];

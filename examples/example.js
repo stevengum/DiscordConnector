@@ -1,15 +1,21 @@
-const DC = require('./DiscordConnector');
-const CS = require('./ConnectorStorage');
+const DC = require('./../DiscordConnector');
+const CS = require('./../ConnectorStorage');
+const TCS = require('./../TestConnectorStorage');
 
 require('dotenv').config();
 
-// A ConnectorStorage client must be instantiated and initialized. This class provides the logic to map Direct Line conversation IDs to Discord Channel IDs.
-var storage = new CS.ConnectorStorage({
-    host: process.env.DOCUMENTDB_HOST,
-    masterKey: process.env.DOCUMENTDB_MASTER_KEY,
-    database: process.env.DOCUMENTDB_DB_NAME,
-    collection: process.env.DOCUMENTDB_COLLECTION
-});
+// A ConnectorStorage or TestConnectorStorage client must be instantiated and initialized. This class provides the logic to map Direct Line conversation IDs to Discord Channel IDs.
+
+// Example configuration for ConnectorStorage
+// var storage = new CS.ConnectorStorage({
+//     host: process.env.DOCUMENTDB_HOST,
+//     masterKey: process.env.DOCUMENTDB_MASTER_KEY,
+//     database: process.env.DOCUMENTDB_DB_NAME,
+//     collection: process.env.DOCUMENTDB_COLLECTION
+// });
+
+// This example implements the TestConnectorStorage which caches the conversation-channel pairings.
+var storage = new TCS.TestConnectorStorage();
 storage.initialize();
 
 // DiscordConnector configuration file, discordSecret, dlSecret and botName are all required at this time.

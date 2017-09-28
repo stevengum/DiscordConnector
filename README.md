@@ -1,7 +1,6 @@
 # DiscordConnector 
 
-#### Version 0.7.3
-
+#### Version 0.7.3 - [NPM][npm]
 ___
 
 ## Description:
@@ -16,10 +15,15 @@ ___
 
 ## Setup:
 ```
-npm install
+npm install discordconnector
 ```
 
-### ffmpeg
+[`uws`][uws] is a peer dependency of Discord.js and must be installed. All other unmet dependency messages can be safely ignored.
+
+
+### Voice & ffmpeg:
+At the moment voice is not yet supported with this adapter, though its support is planned.
+
 - [Guide on installing ffmpeg][adaptlearning/ffmpeg]
 - [WikiHow on installing ffmpeg][wikihow/ffmpeg]
 
@@ -66,3 +70,5 @@ ___
   [cardActionTypes]: ./Consts.js
   [oneAttachmentLimit]: https://feedback.discordapp.com/forums/326712-discord-dream-land/suggestions/17614645-attach-multiple-photos-to-messages-and-choose-if-t
   [example_1]: ./examples/example.js
+  [npm]: https://www.npmjs.com/package/discordconnector
+  [uws]: https://www.npmjs.com/package/uws

@@ -518,7 +518,10 @@ class DiscordConnector {
         
         if (activity.type == 'typing') {
             channel.startTyping();
-            return;
+            setTimeout(() => {
+                channel.stopTyping(true);
+                return;
+            }, 500);
         }
         
         var msgWithAttachments = this.activityAttachmentsHandler(activity);

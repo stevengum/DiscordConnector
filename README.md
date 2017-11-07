@@ -7,7 +7,7 @@ ___
 
 **DiscordConnector** allows bots written using **[Microsoft's Bot Framework][botframework]** to be used in the popular VoIP client, **[Discord][discordapp]**. DiscordConnector uses the Bot Framework's **[Direct Line API][directline]** to connect a Bot Framework Bot to Discord. This connector implements **[Discord.js][discord.js]** to map Direct Line's Activity objects to Discord-consumable events.
 
-The **ConnectorStorage** provides multiple conversation support. A succinct description is that the DiscordConnector uses an external storage to store Direct Line Conversationi ID and Discord Channel ID pairings; this allows your users to continue conversations with their bot.
+The **ConnectorStorage** provides multiple conversation support. A succinct description is that the DiscordConnector uses an external storage to store Direct Line Conversation ID and Discord Channel ID pairings; this allows your users to continue conversations with their bot. The **TestConnectorStorage** provides the same support but caches the pairings internally. Use the TestConnectorStorage for rapid prototyping/trying out DiscordConnector.
 
 The **DiscordHelperModule** focuses on providing Discord-specific functionalities and commands, e.g. having a bot join or leave a channel, getting a list of users from the Discord.js client, etc.  
 

@@ -210,8 +210,8 @@ class DiscordConnector {
                     var file = {
                         file: att.contentUrl
                     }
-                    attachments = file;
-                    return file;
+                    attachments = [file];
+                    return attachments;
                 }
 
                 if (/image\//.test(att.contentType)) {

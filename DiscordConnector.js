@@ -339,7 +339,7 @@ class DiscordConnector {
                 }
             }
             // This next line adds the user to the cached users in the bot.
-            if (!this.client.usersg.get(member.id)) this.client.users.set(member.id, member.user);
+            if (!this.client.users.get(member.id)) this.client.users.set(member.id, member.user);
             this.postActivity(activity);
         });
 

@@ -31,7 +31,7 @@ class DiscordConnector {
         if (!this.discordSecret) throw new Error('DiscordConnector.createDiscordClient - ERROR: Discord bot secret not found. Unable to complete connection to Discord servers.');
         var client = new Discord.Client(this.discordConfig).on('ready', () => { console.log('Connected to Discord Servers.')});
         client.on('error', err => {
-            console.log(error);
+            console.log(err);
         });
         client.login(this.discordSecret);
         return client;

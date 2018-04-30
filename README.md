@@ -1,6 +1,6 @@
 # DiscordConnector 
 
-# DEPRECATED: This project currently not being maintained as there are some changes to the various moving parts Bot Framework. 
+# DEPRECATED: This project is currently not being maintained as there have been some changes to the various parts Bot Framework. These changes go against the original intent of this DiscordConnector. 
 
 ### This project may be revived later when the [V4 botbuilder-js](https://github.com/Microsoft/botbuilder-js) SDK reaches production-quality status and a new [BotAdapter-based implementation](https://github.com/Microsoft/botbuilder-js/blob/master/libraries/botbuilder-core/src/botAdapter.ts) may be created.
 

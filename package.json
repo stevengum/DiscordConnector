@@ -1,10 +1,15 @@
 {
   "name": "discordconnector",
-  "version": "0.7.3",
-  "description": "Discord-Bot Framework connector that uses Discord.js and Bot Framework's Direct Line to connect Bot Framework bots to Discord.",
-  "main": "index.js",
+  "version": "1.0.0-next",
+  "description": "Discord-Bot Framework connector that uses Discord.js and the Bot Framework SDK for JS to connect Bot Framework bots to Discord.",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc -b",
+    "clean": "rimraf lib tsconfig.tsbuildinfo",
+    "lint": "eslint . --ext .ts",
+    "test": "nyc mocha",
+    "test:min": "nyc --silent mocha --reporter dot"
   },
   "keywords": [
     "chatbots",
@@ -15,20 +20,60 @@
     "discord.js"
   ],
   "author": "Steven Gum",
-  "bugs" : {
-    "url": "https://github.com/stevengum97/DiscordConnector/issues"
+  "bugs": {
+    "url": "https://github.com/stevengum/DiscordConnector/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/stevengum97/DiscordConnector.git"
+    "url": "https://github.com/stevengum/DiscordConnector.git"
   },
   "license": "MIT",
   "dependencies": {
-    "discord.js": "11.2.0",
+    "botbuilder-core": "~4.13.1",
+    "discord.js": "12.5.3",
     "mime-types": "2.1.16",
-    "request": "2.81.0",
-    "request-promise": "4.2.1",
-    "websocket": "1.0.24",
-    "uws": "8.14.1"
-  }
+    "runtypes": "^6.3.0",
+    "typescript": "^4.2.4",
+    "uws": "8.14.1",
+    "websocket": "1.0.24"
+  },
+  "devDependencies": {
+    "@types/mocha": "^8.2.2",
+    "@types/sinon": "^10.0.0",
+    "@types/ws": "^7.4.2",
+    "@typescript-eslint/eslint-plugin": "^4.22.1",
+    "@typescript-eslint/parser": "^4.22.1",
+    "eslint": "^7.25.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-jsdoc": "^33.1.0",
+    "eslint-plugin-mocha": "^8.1.0",
+    "eslint-plugin-only-warn": "^1.0.2",
+    "eslint-plugin-prettier": "^3.4.0",
+    "eslint-plugin-security": "^1.4.0",
+    "mocha": "^8.3.2",
+    "nyc": "^15.1.0",
+    "prettier": "^2.2.1",
+    "rimraf": "^3.0.2",
+    "sinon": "^10.0.0",
+    "source-map-support": "^0.5.19",
+    "ts-node": "^9.1.1"
+  },
+  "peerDependencies": {},
+  "mocha": {
+    "extension": ".test.ts",
+    "exit": true,
+    "recursive": true,
+    "require": [
+      "ts-node/register",
+      "source-map-support/register"
+    ],
+    "spec": [
+      "__tests__"
+    ]
+  },
+  "files": [
+    "lib",
+    "src"
+  ]
 }

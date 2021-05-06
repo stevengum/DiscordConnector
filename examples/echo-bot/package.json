@@ -1,0 +1,26 @@
+{
+  "name": "echo-bot",
+  "private": true,
+  "version": "1.0.0",
+  "description": "",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "rimraf lib tsconfig.tsbuildinfo",
+    "start": "node lib/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stevengum/DiscordConnector.git"
+  },
+  "author": "Steven Gum",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/stevengum/DiscordConnector/issues"
+  },
+  "homepage": "https://github.com/stevengum/DiscordConnector#readme",
+  "devDependencies": {
+    "rimraf": "^3.0.2",
+    "typescript": "^4.2.4"
+  }
+}

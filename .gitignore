@@ -1,4 +1,8 @@
 node_modules/ 
-.vscode/
+**/.vscode/
+.nyc_output/
 work/
 .env
+lib/
+**/*.js
+tsconfig.tsbuildinfo

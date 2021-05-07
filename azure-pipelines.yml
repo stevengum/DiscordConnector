@@ -1,0 +1,24 @@
+trigger:
+- vNext
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- task: NodeTool@0
+  inputs:
+    versionSpec: '14.x'
+  displayName: 'Install Node.js'
+
+- script: |
+    npm i -g yarn
+  displayName: 'Install yarn'
+
+- script: |
+    yarn install
+    yarn run build
+  displayName: 'yarn install and build'
+
+- script: |
+    yarn test
+  displayName: 'yarn test'

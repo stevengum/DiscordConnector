@@ -1,11 +1,11 @@
 import * as a from 'assert';
 import * as s from 'sinon';
-import { DiscordActivityHandler, DiscordAdapter, DiscordAdapterOptions } from '../lib';
+import { DiscordActivityHandler, DiscordAdapter, DiscordAdapterOptions } from '../';
 
 describe('DiscordActivityHandler', function () {
     this.timeout(1000);
     let sandbox: s.SinonSandbox;
-    const opts: DiscordAdapterOptions = { discordToken: 'fakeToken' };
+    const opts: DiscordAdapterOptions = { discordToken: 'fakeToken', discordAppId: 'fakeAppId' };
 
     beforeEach(function () {
         sandbox = s.createSandbox();
